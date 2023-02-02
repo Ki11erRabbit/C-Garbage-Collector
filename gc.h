@@ -12,7 +12,7 @@ typedef struct Pointer {
 } Pointer;
 
 typedef map_t(struct Pointer) map_pointer_t;
-static map_pointer_t *map = NULL;
+static map_pointer_t map;
 
 static void *stackPointer = NULL;
 static void *oldStackPointer = NULL;
@@ -27,7 +27,7 @@ int rc_main(int argc, char** argv);
 
 #define main(...) \
   main(int argc, char** argv) { \
-    setupHeap() \
+    setupHeap(); \
     long stk = (long)NULL;            \
     pthread_t gcThread;         \
     pthread_create(&gcThread,NULL,garbageCollector,(void *)&stk);\

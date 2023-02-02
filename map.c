@@ -7,6 +7,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 #include "map.h"
 
 struct map_node_t {

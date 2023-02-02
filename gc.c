@@ -24,7 +24,7 @@ void *allocate(size_t size) {
         marked = 1;
     }
     Pointer pointer = {ptr, marked, size};
-    map_set(map, key, pointer);
+    map_set(&map, key, pointer);
 
     if (ptr > maxptr) {
         maxptr = ptr;
@@ -43,7 +43,7 @@ void *reallocate(void *ptr, size_t size) {
 
     char key[20];
     sprintf(key, "%p", ptr);
-    map_remove(map, key);
+    map_remove(&map, key);
 
     sprintf(key, "%p", newptr);
     char marked = 0;
@@ -51,7 +51,7 @@ void *reallocate(void *ptr, size_t size) {
         marked = 1;
     }
     Pointer pointer = {newptr, marked, size};
-    map_set(map, key, pointer);
+    map_set(&map, key, pointer);
 
     if (ptr > maxptr) {
         maxptr = ptr;
@@ -76,7 +76,7 @@ void *continuousAllocate(size_t num, size_t size) {
         marked = 1;
     }
     Pointer pointer = {ptr, marked, size};
-    map_set(map, key, pointer);
+    map_set(&map, key, pointer);
 
     if (ptr > maxptr) {
         maxptr = ptr;
@@ -90,7 +90,7 @@ void *deallocate(void *ptr) {
 
     char key[20];
     sprintf(key, "%p", ptr);
-    map_remove(map, key);
+    map_remove(&map, key);
 
     free(ptr);
 }
@@ -105,14 +105,14 @@ void addReference(void *ptr, size_t size) {
         marked = 1;
     }
     Pointer pointer = {ptr, marked, size};
-    map_set(map, key, pointer);
+    map_set(&map, key, pointer);
 }
 void removeReference(void *ptr) {
     updateStackPointer();
 
     char key[20];
     sprintf(key, "%p", ptr);
-    map_remove(map, key);
+    map_remove(&map, key);
 }
 
 void signal_end() {
@@ -136,6 +136,7 @@ static void mark_stack(void) {
 #ifdef __amd64__
     oldStackPointer = stackPointer;
     stackPointer = (void*)getrsp();
+    printf("stackPointer: %p\n", stackPointer);
 #else
     long stackTop = (long) NULL;
     oldStackPointer = stackPointer;
@@ -159,7 +160,7 @@ void updateStackPointer() {
 static int gc_allocated(void *a) {
     char key[20];
     sprintf(key,"%p", a);
-    void *value = map_get(map,key);
+    void *value = map_get(&map,key);
     if (value == NULL) {
         return 0;
     }
@@ -169,7 +170,7 @@ static int gc_allocated(void *a) {
 static int gc_isMarked(void *a) {
     char key[20];
     sprintf(key,"%p", a);
-    Pointer *value = map_get(map,key);
+    Pointer *value = map_get(&map,key);
     if (value->marked == 1) {
         return 1;
     }
@@ -181,7 +182,7 @@ static int gc_isMarked(void *a) {
 static void gc_mark(void *a) {
     char key[20];
     sprintf(key,"%p", a);
-    Pointer *value = map_get(map,key);
+    Pointer *value = map_get(&map,key);
     if (flipped) {
         value->marked = 0;
     }
@@ -198,7 +199,7 @@ static void gc_recurse(void *ptr) {
 
     char key[20];
     sprintf(key,"%p", ptr);
-    Pointer *value = map_get(map,key);
+    Pointer *value = map_get(&map,key);
     for (size_t i = 0; i < value->size * sizeof(void*); i++) {
         size_t *p = (char*)ptr + i;
         gc_mark_item((void*)*p);
@@ -221,7 +222,7 @@ static void mark(void *stackStart) {
     char *bottom = (char *) stackStart;
 
     for (char *p = top; p <= bottom; p += sizeof(void *)) {
-        gc_mark_item(*p);
+        gc_mark_item((void *) *p);
     }
 }
 
@@ -229,19 +230,21 @@ static void sweep() {
     const char *key;
     map_iter_t iter = map_iter(map);
 
-    while ((key = map_next(map, &iter))) {
-        Pointer *value = map_get(map,key);
+    while ((key = map_next(&map, &iter))) {
+        Pointer *value = map_get(&map,key);
         if (!gc_isMarked(value->ptr)) {
-            map_remove(map,key);
+            fprintf(stderr, "freeing %p", value->ptr);
+            map_remove(&map,key);
             free(value->ptr);
         }
     }
 }
 
 void *garbageCollector(void *ptr) {
-    map_init(map);
+    map_init(&map);
     void *stackStart = NULL;
     stackStart = ptr;
+    printf("stackStart: %p\n", stackStart);
 
     while (!ended) {
 
@@ -260,9 +263,9 @@ void *garbageCollector(void *ptr) {
     const char *key;
     map_iter_t iter = map_iter(map);
 
-    while ((key = map_next(map, &iter))) {
-        free(map_get(map,key)->ptr);
+    while ((key = map_next(&map, &iter))) {
+        free(map_get(&map,key)->ptr);
     }
 
-    map_deinit(map);
+    map_deinit(&map);
 }
